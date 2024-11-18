@@ -25,7 +25,7 @@ setup(
     install_requires=[
         'numpy >= 1.17',
         'scipy',
-        'numba > 0.46',
+        'numba > 0.46, < 0.59',
         'h5py',
         'sparse',
     ],
