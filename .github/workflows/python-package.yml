@@ -104,7 +104,7 @@ jobs:
           IPython \
           h5py;
         conda install -c conda-forge sparse;
-        conda install -c defaults "numba>=0.45.1,<0.59";
+        conda install -c defaults "numba>=0.45.1,<0.60";
         # make sure in conda we do not overwrite dependencies with pip
         python setup.py develop --no-deps;
         # test dependencies
