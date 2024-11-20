@@ -39,47 +39,37 @@ jobs:
         # conda needs this to activate environments properly
         shell: bash -l {0}
     needs: lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11"]
+        name: ['without JIT', 'default', 'doctests', 'slow tests', 'conda', 'benchmarks']
         include:
-          # fastest jobs first
-          - python-version: 3.11
-            name: without JIT
-            disable_jit: 1
-          - python-version: 3.11
-            name: doctests
-            mode: doctests
-          # really slow job next, so it runs in parallel with the others
-          - python-version: 3.11
-            name: slow tests
-            mode: very_slow
-          - python-version: 3.8
-            name: default
-          - python-version: 3.11
-            name: default
-          - python-version: 3.12
-            name: default
-          - python-version: 3.11
-            name: conda
-            conda: true
-          - python-version: 3.11
-            name: benchmarks
-            mode: bench
+          # default tests with more python versions
+          - os: ubuntu-latest
+            python-version: "3.8"
+            name: 'default'
+          - os: ubuntu-latest
+            python-version: "3.12"
+            name: 'default'
+          - os: windows-latest
+            python-version: "3.12"
+            name: 'default'
 
-    name: "build | ${{ matrix.name }} | Python ${{matrix.python-version}}"
+    name: "build | ${{ matrix.name }} | Py ${{matrix.python-version}} | ${{ matrix.os }}"
     steps:
     - uses: actions/checkout@v4
 
     # python / pip
     - name: Set up Python ${{ matrix.python-version }}
-      if: "!matrix.conda"
+      if: ${{ matrix.name != 'conda' }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
-      if: "!matrix.conda"
+      if: ${{ matrix.name != 'conda' }}
       run: |
         python -m pip install --upgrade pip;
         pip install . --prefer-binary;
@@ -88,13 +78,13 @@ jobs:
 
     # conda
     - name: Set up Python ${{ matrix.python-version }} (conda)
-      if: matrix.conda
+      if: ${{ matrix.name == 'conda' }}
       uses: conda-incubator/setup-miniconda@v3
       with:
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies (conda)
-      if: matrix.conda
+      if: ${{ matrix.name == 'conda' }}
       run: |
         echo $CONDA/bin >> $GITHUB_PATH;
         conda install \
@@ -110,30 +100,37 @@ jobs:
         # test dependencies
         python -m pip install --upgrade pytest pytest-cov pytest-benchmark;
 
-    - name: Test with pytest
+    - name: Select PYTEST_ARGS (${{ matrix.name }})
       env:
-        MODE: ${{ matrix.mode }}
-        NUMBA_DISABLE_JIT: ${{ matrix.disable_jit }}
+        NAME: ${{ matrix.name }}
       run: |
+        if [[ "${NAME}" == "without JIT" ]]; then
+          echo NUMBA_DISABLE_JIT=1
+          echo NUMBA_DISABLE_JIT=1 >> $GITHUB_ENV
+        fi;
         PYTEST_ARGS=();
-        if [[ "${MODE}" == "bench" ]]; then
+        if [[ "${NAME}" == "benchmarks" ]]; then
           PYTEST_ARGS+=(--benchmark-only);
         else
           PYTEST_ARGS+=(--benchmark-skip);
         fi;
-        if [[ "${MODE}" == "very_slow" ]]; then
-          PYTEST_ARGS+=(-m "veryslow");
+        if [[ "${NAME}" == "slow tests" ]]; then
+          PYTEST_ARGS+=(-m \"veryslow\");
         else
-          PYTEST_ARGS+=(-m "not veryslow");
+          PYTEST_ARGS+=(-m \"not veryslow\");
         fi;
-        if [[ "${MODE}" == "doctests" ]]; then
+        if [[ "${NAME}" == "doctests" ]]; then
           PYTEST_ARGS+=(--doctest-modules --ignore clifford/test);
         fi;
+        echo PYTEST_ARGS=${PYTEST_ARGS[@]}
+        echo PYTEST_ARGS=${PYTEST_ARGS[@]} >> $GITHUB_ENV
 
+    - name: Test with pytest
+      run: |
         # `python -m` ensures we dispatch to conda if appropriate
         python -m pytest \
           --pyargs clifford \
-          "${PYTEST_ARGS[@]}" \
+          ${{ env.PYTEST_ARGS }} \
           --color=yes \
           -o junit_family=legacy \
           --junitxml=junit/test-results.xml \
