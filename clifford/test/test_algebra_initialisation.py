@@ -2,23 +2,14 @@ import numpy as np
 import pytest
 
 from clifford import Cl, conformalize, _powerset
-from clifford._numba_utils import DISABLE_JIT
 
 from . import rng  # noqa: F401
-
-too_slow_without_jit = pytest.mark.skipif(
-    DISABLE_JIT, reason="test is too slow without JIT"
-)
 
 
 class TestInitialisation:
 
     @pytest.mark.parametrize("n", [
-        x
-        for x in range(2, 7)
-    ] + [
-        pytest.param(x, marks=too_slow_without_jit)
-        for x in range(7, 9)
+        x for x in range(2, 9)
     ])
     def test_speed(self, n, benchmark):
         def generate_algebra():
@@ -35,11 +26,10 @@ class TestInitialisation:
             layout.inv_func
         benchmark(generate_algebra)
 
-    @too_slow_without_jit
-    @pytest.mark.veryslow
     @pytest.mark.parametrize(
         'algebra',
-        [Cl(i) for i in [4]] + [conformalize(Cl(3)[0])],
+        [Cl(i) for i in [4]]
+        + [pytest.param(conformalize(Cl(3)[0]), marks=pytest.mark.veryslow)],
         ids=['Cl(4)', 'conformalize(Cl(3))']
     )
     def test_sparse_multiply(self, algebra, rng):  # noqa: F811
