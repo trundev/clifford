@@ -19,10 +19,8 @@ If you are not using Anaconda, you can install ``clifford`` from PyPI using the 
 
 .. note ::
 
-    The 1.3 release and older are not compatible with :mod:`numba` 0.50.0, and emit a
-    large number of warnings on 0.49.0. To avoid these warnings, install with::
-
-        pip3 install clifford "numba~=0.48.0" "sparse~=0.9.0"
+    The currently latest :mod:`numba` 0.60.0 can not be installed under Pythoon 3.13, use 3.12 instead.
+    Support must be added in :mod:`numba` 0.61.0. Track issue here: https://github.com/numba/numba/issues/9798
 
 If you want the development version of ``clifford`` you can ``pip install`` from the latest master with::
 
