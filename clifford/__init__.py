@@ -141,21 +141,6 @@ def get_mult_function(mt: sparse.COO, gradeList,
         # We can pass the sparse filter mask directly
         mt = sparse.where(filter_mask, mt, mt.dtype.type(0))
 
-        return _get_mult_function(mt)
-
-    else:
-        return _get_mult_function_runtime_sparse(mt)
-
-
-def _get_mult_function(mt: sparse.COO):
-    """
-    Get a function similar to `` lambda a, b: np.einsum('i,ijk,k->j', a, mt, b)``
-
-    Returns
-    -------
-    func : function (array_like (n_dims,), array_like (n_dims,)) -> array_like (n_dims,)
-        A function that computes the appropriate multiplication
-    """
     # unpack for numba
     dims = mt.shape[1]
     k_list, l_list, m_list = mt.coords
@@ -167,34 +152,6 @@ def _get_mult_function(mt: sparse.COO):
         output = np.zeros(dims, dtype=res.dtype)
         # Can not use "np.add.at(output, l_list, res)", as ufunc.at is not supported by numba
         for l, val in zip(l_list, res):
-            output[l] += val
-        return output
-
-    return mv_mult
-
-
-def _get_mult_function_runtime_sparse(mt: sparse.COO):
-    """
-    A variant of `_get_mult_function` that attempts to exploit runtime zeros
-
-    The returned function avoids performing multiplications if vectors contain
-    zeros.
-
-    TODO: determine if this actually helps.
-    """
-    # unpack for numba
-    dims = mt.shape[1]
-    k_list, l_list, m_list = mt.coords
-    mult_table_vals = mt.data
-
-    @_numba_utils.njit
-    def mv_mult(value, other_value):
-        # Use mask where both operands are non-zero, to avoid zero-multiplications
-        nz_mask = (value != 0.0)[k_list] & (other_value != 0.0)[m_list]
-        res = value[k_list[nz_mask]] * mult_table_vals[nz_mask] * other_value[m_list[nz_mask]]
-        output = np.zeros(dims, dtype=res.dtype)
-        # Can not use "np.add.at(output, l_list[nz_mask], res)", as ufunc.at is not supported by numba
-        for l, val in zip(l_list[nz_mask], res):
             output[l] += val
         return output
 
